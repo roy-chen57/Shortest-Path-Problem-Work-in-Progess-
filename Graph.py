@@ -1,7 +1,13 @@
 import tkinter as tk
+from tkinter import messagebox
+from tkinter import simpledialog
 
 # Class Node: node of a mathematical graph
 class Node:
+	# class variables storing the number of Node objects
+	# clicked and the first Node object clicked
+	# in order to draw edges between Node objects
+	num = 0
 	count = 0
 	startNode = None
 
@@ -22,18 +28,26 @@ class Node:
 		self._y = y
 		self._edges = []
 		self._isClicked = False
+		self._label = "node " + str(Node.num)
 		
-		self.btn = tk.Button(canvas, text="Node", font=('Arial', 18), command=self.clicked)
+		self.btn = tk.Button(canvas, text=self._label, font=('Arial', 18), command=self.clicked)
+		#print(self.btn.cget('text'))
+		Node.num += 1
 		self.btn["state"] = tk.DISABLED
 
 	## getX() returns x-coordinate of node
-	## getX: Node -> int
+	## getX: Node -> Int
 	def getX(self):
 		return self._x
 	## getY() returns x-coordinate of node
-	## getY: Node -> int
+	## getY: Node -> Int
 	def getY(self):
 		return self._y
+	## getLabel() returns the label on the button of the node
+	## getLabel: Node -> Str
+	def getLabel(self):
+		return self._label
+
 
 	## addEdge(self, edge) appends an Edge object to self._edges
 	## MUTATION: appends an Edge obejct to self._edges
@@ -63,7 +77,7 @@ class Node:
 			# if the node is clicked again, cancel the command to draw
 			# an edge
 			if Node.count == 1:
-				print("Cancel")
+				#print("Cancel")
 				Node.count = 0
 				Node.startNode = None
 		else:
@@ -73,20 +87,43 @@ class Node:
 			# if this node is the first node clicked, save the node
 			# for later to draw the edge
 			if Node.count == 0:
-				print("Click 1")
+				#print("Click 1")
 				Node.startNode = self
 				Node.count += 1
 			# if this is the second node clicked, create an Edge between
 			# the first node clicked and this node
 			elif Node.count == 1:
-				print("Click 2")
-				newEdge = Edge(Node.startNode, self, weight=1, canvas=self.btn.master)
+				#print("Click 2")
+				# Prevent users from creating the same Edge
+				if Node.startNode.hasEdge(self):
+					self.raiseBtn()
+					Node.startNode.raiseBtn()
+					Node.startNode = None
+					Node.count = 0
+					messagebox.showerror("Error", "Error: Edge has already been created")
+					return None
+
+				newEdge = Edge(Node.startNode, self, canvas=self.btn.master)
 				Node.count = 0
 				Node.startNode = None
 
-	def getIsClicked(self):
-		return self._isClicked
+	## hasEdge(self, end, directed) checks if there is already an edge
+	##		from the start node to the end node
+	## hasEdge: Node, Node -> Bool
+	def hasEdge(self, node):
+		edges = {e.getStartNode() for e in self._edges}.union({e.getEndNode() for e in self._edges})
+		if node in edges:
+			return True
+		else:
+			return False
 
+
+	
+	## raiseBtn(self) changes the state of the Node object's button
+	##		to the raised position
+	## MUTATION: changes self._isClicked to False and 
+	##		button relief to raised
+	## raiseBtn: Node -> None
 	def raiseBtn(self):
 		self.btn.config(relief=tk.RAISED)
 		self._isClicked = False
@@ -102,42 +139,70 @@ class Node:
 		except:
 			pass
 
+	@classmethod
+	## reset(cls) resets Node class variables dictating creation of Edges
+	## MUTATION: changes the value of Node.count and Node.startNode
+	## reset: Node class -> None
+	def reset(cls):
+		Node.count = 0
+		Node.num = 0
+		Node.startNode = None
+
 # Class Edge: edge of a mathematical graph
 class Edge:
 	## Constructor
 	## startNode: Node object for starting node
 	## endNode: Node object for ending node
 	## weight: Int for weight of edge
-	## directed: Bool if Edge is directed or not
-	def __init__(self, startNode, endNode, weight, canvas, directed=False):
+	## undirected: Bool if Edge is directed or not
+	def __init__(self, startNode, endNode, canvas, undirected=True):
 		"""
 		self._weight: weight of the edge
-		self._direct: boolean if the Edge is a direct edge or undirected
 		self._startNode: starting Node of the Edge
 		self._endNode: ending Node of the Edge
 		self._line: line drawn onto the canvas
 		"""
-		self._weight = weight
-		self._direct = directed
+		self._weight = 1
 		self._startNode = startNode
 		self._endNode = endNode
-		if directed:
+		if undirected:
 			self._line = canvas.create_line(startNode.getX(), startNode.getY(),
-											endNode.getX(), endNode.getY(), arrow=tk.LAST)
+											endNode.getX(), endNode.getY(), width=3)
+			# create simpledialog popup and enter weight of edge
+			self._weight = simpledialog.askfloat("Weight", "Enter the weight of the edge")
+			weightLab = tk.Label(canvas, text=self._weight, font=('Arial',18))
+			canvas.create_window(abs(startNode.getX()+endNode.getX())/2,
+								 abs(startNode.getY()+endNode.getY())/2,window=weightLab)
+
 		else:
 			self._line = canvas.create_line(startNode.getX(), startNode.getY(),
-											endNode.getX(), endNode.getY())
+											endNode.getX(), endNode.getY(), width=3, arrow=tk.LAST)
 		
 		# raise the two nodes' button 
 		startNode.raiseBtn()
 		endNode.raiseBtn()
 
 		startNode.addEdge(self)
-		if not directed: # if directed edge, end node can't use the Edge
+		if undirected: # if directed edge, end node can't use the Edge
 			endNode.addEdge(self)
+	
+	## getStartNode(self) returns the self._startNode Node object
+	## getStartNode: Edge -> Node
+	def getStartNode(self):
+		return self._startNode
+	## getEndNode(self) returns the sefl._endNode Node object
+	## getEndNode: Edge -> Node
+	def getEndNode(self):
+		return self._endNode
 
 	## getWeight(self) returns the weight value of the Edge object
 	## getWeight: Edge -> Int
 	def getWeight(self):
 		return self._weight
+
+	## shortcuts(self, event) defines the action of keyboard shorcuts
+	## MUTATION: deletes the self._edgeWeight field, mutates self._edgeWeight field,
+	##			 mutates self._weight field
+	## shortcuts: Edge, tk.event -> None
+	#def shortcuts(self, event):
 
